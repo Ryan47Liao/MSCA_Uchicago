@@ -4,39 +4,55 @@ import pandas as pd
 import numpy as np 
 import copy 
 
-def Sweep_k(A,k,dk,round = 10,eps = 2**-26):
+def Sweep_k(A,k,dk,round = 10,eps = 1e-7):
     "Perform sweep algorithm over matrix A on k_th row and col"
     A = np.array(np.around(A,round)) 
     A = A.astype('float64')
-    assert A[k,k]!= 0, f'A_kk != 0,but for A_{k}{k} = {A[k,k]}'
     I,J = A.shape
-    for i in range(I):
+    if A[k,k] <  dk*eps: #f'A_kk != 0,but for A_{k}{k} = {A[k,k]}'
+        print(f"A_{k}{k} is 0")
+        A[:,k] = np.zeros(J)
+        A[k,:] = np.zeros(I)
+    else:
+        # Akk = A[k,k]
+        # A = A - np.outer(A[:, k], A[k, :]) / Akk
+        # A[:, k] = A[:, k] / abs(Akk)
+        # A[k, :] = A[:, k]
+        # A[k, k] = -1.0 / Akk
+        for i in range(I):
+            for j in range(J):
+                if i!=k and j!= k:
+                    A[i,j] = A[i,j] - A[i,k]*A[k,j]/A[k,k] #Step 1
+        for i in range(I):
+            if i != k:
+                A[i,k] = A[i,k] / abs(A[k,k]) #Step 2
         for j in range(J):
-            if i!=k and j!= k:
-                A[i,j] = A[i,j] - A[i,k]*A[k,j]/A[k,k] #Step 1
-    for i in range(I):
-        if i != k:
-            A[i,k] = A[i,k] / abs(A[k,k]) #Step 2
-    for j in range(J):
-        if j != k:
-            A[k,j] = A[k,j]/abs(A[k,k]) #Step 3 
-    A[k,k] = -1/A[k,k] #Step 4
+            if j != k:
+                A[k,j] = A[k,j]/abs(A[k,k]) #Step 3 
+        A[k,k] = -1/A[k,k] #Step 4
     return A 
 
 def SWEEP(A,Indexs = None, PRINT = False,round = 3, RETURN_INV = False):
     "Perform SWEEP algorithm REPEATEDLY over matrix A(X.T@X) on specified indexes in the order given"
     Og_A = np.array(A)
+    A = A.astype('float64')
     if Indexs is None:
         Indexs = range(A.shape[0]-1)
     for k in Indexs:
         A = Sweep_k(copy.copy(A),k,dk = Og_A[k,k] ) #Upadted 20/01/22
         if PRINT:
             print(k)
-            print(np.around(A,round))
+            print(pd.DataFrame(np.around(A,round)))
     if RETURN_INV:
         return A 
     else:
         return np.around(A[-1,:], round)
+
+def LR_sweep(X,y):
+    X['_Response'] = y 
+    b = SWEEP(X.T@X)[:-1]
+    SSE = b[-1,-1]
+    return SSE,b 
 
 def Forward_selection(X,y,alpha = 0.05):
     '''
